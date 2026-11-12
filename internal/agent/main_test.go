@@ -97,5 +97,10 @@ func TestMain(m *testing.M) {
 	// there (a reverse proxy, #1985): known, and not magpie, as for a
 	// relay; the proxy-kept tests answer it
 	magpieAt = func(string) (bool, bool) { return false, true }
+	// nor is a dsh instance of this machine's found and given a row of its
+	// own (dsh_instances.go): a developer running a second one — DSH_HOME
+	// set, 3081's trial profile — would have it listed in every test that
+	// walks the agents. The instance tests say what runs.
+	dshScan = func() []dshInstance { return nil }
 	os.Exit(testenv.Run(m))
 }

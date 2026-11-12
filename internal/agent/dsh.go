@@ -134,6 +134,13 @@ func dshAt(at place) *Agent {
 	}
 	a := dshOn(at, dir, "dsh", fresh, lead)
 	a.ID, a.Name, a.Icon, a.Aliases = "dsh", "DeepSeek Harness", "deepseek-color", []string{"deepseek-harness"}
+	// the port its server answers on, when one runs on this home, so that
+	// this row and an instance's read apart (3080's web, 3081's trial)
+	if !at.cold && at.spell == nil {
+		if port := dshPortOf(dir); port > 0 {
+			a.Name = dshInstanceName("", port)
+		}
+	}
 	a.UA = []string{"deepseek-harness"}
 	a.Bin = "dsh"
 	// the desktop app installed and not opened yet has no ~/.dsh (#2279)

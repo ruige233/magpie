@@ -294,7 +294,7 @@ func onMachine(home, cfg string) []*Agent { return dropMoved(onMachineAll(home, 
 
 // onMachineAll is onMachine with every built-in.
 func onMachineAll(home, cfg string) []*Agent {
-	return append([]*Agent{
+	return withDshInstances(append([]*Agent{
 		claude(home),
 		claudeDesktop(home),
 		claudeScience(),
@@ -384,7 +384,7 @@ func onMachineAll(home, cfg string) []*Agent {
 		aionui(),
 		cherryStudio(home),
 		lody(home),
-	}, append(append(append(ompProfiles(home), qwenpawAgents(home)...), hermesProfileAgents(home)...), claudeDirAgents(home)...)...)
+	}, append(append(append(ompProfiles(home), qwenpawAgents(home)...), hermesProfileAgents(home)...), claudeDirAgents(home)...)...), home)
 }
 
 // ---- accessors -------------------------------------------------------------
