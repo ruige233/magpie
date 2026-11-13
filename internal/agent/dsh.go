@@ -582,6 +582,8 @@ func dshHomeHas(dir, id string) bool {
 // true only for an explicit model pick or disconnect. Catalog refreshes
 // leave the home layer's start model alone, as they do the profiles'.
 func dshMirrorHome(dir string, models []catalog.Model, gw string, start bool) error {
+	// the instance's own address at the gateway, not dsh's (dshGW)
+	gw = dshGW(dir, gw)
 	files := dshProfiles(dir)
 	if len(files) == 0 {
 		return nil
@@ -1154,6 +1156,7 @@ func DshURL(a *Agent) string {
 // through (a local proxy's route on loopback before the gateway's address,
 // DshThrough), gw itself when they go to the gateway or anywhere else.
 func dshReach(dir, gw string) string {
+	gw = dshGW(dir, gw)
 	for _, f := range dshProfiles(dir) {
 		_, items, err := dshLook(f)
 		if err != nil {
@@ -1202,6 +1205,7 @@ func dshOverAll(dir string) []dshItem {
 // 0.1.5 — the key it names gone from .env, or another key under that name in
 // dsh's own store, which it reads first.
 func dshCheck(dir, gw string) string {
+	gw = dshGW(dir, gw)
 	if !usesMagpie(dshGet(dir, "")) {
 		return ""
 	}
@@ -1587,6 +1591,7 @@ func dshSettings(dir string) string { return filepath.Join(dir, "settings.yaml")
 // the user's own before magpie's first is kept aside once, as
 // settings.yaml.imported.kept.
 func dshSettingsRoute(dir string, on bool, models []catalog.Model, gw string) error {
+	gw = dshGW(dir, gw)
 	if on && len(models) == 0 {
 		return nil
 	}
@@ -1741,6 +1746,9 @@ func (p place) ownerOnly(path string) error {
 // dshSetFile writes v into one patch list; modern is the layout of dsh
 // 0.1.5 on.
 func dshSetFile(path, v string, modern bool, models []catalog.Model, gw string) error {
+	// an instance writes its own address at the gateway (dshGW): its
+	// requests are then its own in the Routing and Context tabs
+	gw = dshGW(dshWrittenHome(path), gw)
 	head, items, err := dshRead(path)
 	if err != nil {
 		return err

@@ -34,7 +34,12 @@ func takeAgentPath(r *http.Request) *http.Request {
 		return r
 	}
 	id, rest, _ := strings.Cut(rest, "/")
-	if id == "" || !usage.IsAgent(id) {
+	// an id magpie doesn't know is left as it is, unless what follows is
+	// magpie's own API: an agent's instance (dsh's per profile) is known
+	// only while its process runs, and a scan that missed it must not stop
+	// the instance's requests — they are served, and only their name is
+	// the path's
+	if id == "" || (!usage.IsAgent(id) && !strings.HasPrefix(rest, "v1/")) {
 		return r
 	}
 	r2 := r.Clone(context.WithValue(r.Context(), agentPathCtx{}, usage.AgentOf(id)))

@@ -49,7 +49,15 @@ func TestAgentInPath(t *testing.T) {
 	if got := agentOf(call("/v1/chat/completions")); got != "opencode" {
 		t.Errorf("without the path: agent %q, want opencode", got)
 	}
-	for _, p := range []string{"/agent/nobody/v1/models", "/agent//v1/models", "/agent/"} {
+	// an id magpie doesn't know is still served when what follows is
+	// magpie's own API: a dsh instance's id is known only while its process
+	// runs (and never from another machine), and a scan that missed it must
+	// not stop that instance's requests — they are served, their name the
+	// path's alone
+	if r := call("/agent/nobody/v1/models"); r.URL.Path != "/v1/models" || agentOf(r) != "nobody" {
+		t.Errorf("/agent/nobody/v1/models: served at %q as %q", r.URL.Path, agentOf(r))
+	}
+	for _, p := range []string{"/agent/nobody/somewhere/else", "/agent//v1/models", "/agent/"} {
 		if r := call(p); r.URL.Path != p || agentOf(r) != "opencode" {
 			t.Errorf("%s: served at %q as %q", p, r.URL.Path, agentOf(r))
 		}

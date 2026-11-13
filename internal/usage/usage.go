@@ -467,9 +467,19 @@ func knownAgents() []Known {
 	return append(slices.Clip(own), more...)
 }
 
-// IsAgent says whether id is an agent magpie knows, its own or a plugin's,
-// rather than the product name of some other client (Python-urllib).
+// IsAgentInstance says whether id names one instance of an agent that keeps
+// several in one row — a dsh per home or profile, reached at
+// /agent/<instance>/. Package agent sets it from the instances running now,
+// which change between one call and the next and so are not in Agents.
+var IsAgentInstance func(id string) bool
+
+// IsAgent says whether id is an agent magpie knows, its own, a plugin's or
+// one instance of an agent's, rather than the product name of some other
+// client (Python-urllib).
 func IsAgent(id string) bool {
+	if IsAgentInstance != nil && IsAgentInstance(id) {
+		return true
+	}
 	return slices.ContainsFunc(knownAgents(), func(k Known) bool { return k.ID == id || slices.Contains(k.Names, id) })
 }
 

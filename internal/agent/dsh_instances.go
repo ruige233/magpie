@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yetone/magpie/internal/gateway"
 	"github.com/yetone/magpie/internal/proc"
 )
 
@@ -219,6 +220,90 @@ func dshInstanceName(profile string, port int) string {
 	return name
 }
 
+// dshKeys names each instance: the profile it booted, or with the folder of
+// its home when another instance booted the same profile — a profile name
+// alone names the row, and the gateway path, of one instance only.
+func dshKeys(found []dshInstance) map[dshInstance]string {
+	count := map[string]int{}
+	for _, in := range found {
+		count[in.Profile]++
+	}
+	keys := make(map[dshInstance]string, len(found))
+	for _, in := range found {
+		key := in.Profile
+		if count[in.Profile] > 1 {
+			key += "-" + strings.TrimPrefix(filepath.Base(in.Home), ".")
+		}
+		keys[in] = key
+	}
+	return keys
+}
+
+// dshGatewayID is an instance's id at the gateway: which dsh, and which of
+// its instances, in the one path segment a URL takes. The row's own id is
+// dsh#trial-web; a path can't carry a #, so this is dsh-trial-web.
+func dshGatewayID(key string) string { return "dsh-" + key }
+
+// dshGW is the gateway as the dsh on home dir reaches it: an instance's
+// requests go through /agent/<instance>/v1, so the gateway counts them as
+// that instance's. dsh's User-Agent is the same for every instance and its
+// base address used to be too, so two harnesses were one dsh's in the
+// Routing and Context tabs — its live calls, models and session counts
+// summed.
+func dshGW(dir, gw string) string {
+	// what an instance was given already: never nested
+	if strings.Contains(gw, gateway.AgentPath) {
+		return gw
+	}
+	if id := dshGatewayIDOf(dir); id != "" {
+		return gateway.AgentURL(gw, id)
+	}
+	return gw
+}
+
+// dshWrittenHome is the dsh home a patch list belongs to: a profile's
+// (<home>/profiles/<name>/cordis.patch.yml), or the home layer's
+// (<home>/cordis.patch.yml), which goes over every profile's of that home.
+// "" for a file that is neither, so its writes stay as they were.
+func dshWrittenHome(path string) string {
+	if filepath.Base(path) != "cordis.patch.yml" {
+		return ""
+	}
+	if filepath.Base(filepath.Dir(filepath.Dir(path))) == "profiles" {
+		return dshProfileHome(path)
+	}
+	return filepath.Dir(path)
+}
+
+// dshGatewayIDOf is the gateway id of the dsh running on home dir, "" for a
+// home no instance runs on (a dsh installed but not started): its requests,
+// if any, stay the dsh row's.
+func dshGatewayIDOf(dir string) string {
+	dir = filepath.Clean(dir)
+	found := dshScan()
+	keys := dshKeys(found)
+	for _, in := range found {
+		if in.Home == dir {
+			return dshGatewayID(keys[in])
+		}
+	}
+	return ""
+}
+
+// dshPathAgent says whether id names one of the dsh instances running now,
+// what usage.IsAgentInstance asks: the gateway takes /agent/<id>/ requests
+// as that instance's on this word alone (see dshGW).
+func dshPathAgent(id string) bool {
+	found := dshScan()
+	keys := dshKeys(found)
+	for _, in := range found {
+		if dshGatewayID(keys[in]) == id {
+			return true
+		}
+	}
+	return false
+}
+
 // dshPortOf is the port a dsh on home dir answers on, 0 when none is
 // running there.
 func dshPortOf(dir string) int {
@@ -247,19 +332,10 @@ func dshInstances(home, own string) []*Agent {
 	if len(found) == 0 {
 		return nil
 	}
-	// a profile name alone names the row; two of the same profile on
-	// different homes take their folder's
-	count := map[string]int{}
-	for _, in := range found {
-		count[in.Profile]++
-	}
+	keys := dshKeys(dshScan())
 	rows := make([]*Agent, 0, len(found))
 	for _, in := range found {
-		key := in.Profile
-		if count[in.Profile] > 1 {
-			key += "-" + strings.TrimPrefix(filepath.Base(in.Home), ".")
-		}
-		rows = append(rows, dshInstanceAgent(home, in, key))
+		rows = append(rows, dshInstanceAgent(home, in, keys[in]))
 	}
 	return rows
 }

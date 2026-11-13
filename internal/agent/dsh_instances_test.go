@@ -188,3 +188,87 @@ func TestDshInstanceName(t *testing.T) {
 		}
 	}
 }
+
+// Each instance reaches the gateway at an address of its own,
+// <gateway>/agent/<instance>/v1: dsh's User-Agent is the same for both, so
+// without it the gateway counted two harnesses as one dsh's calls.
+func TestDshGatewayPathNamesTheInstance(t *testing.T) {
+	home, dir, _ := dshRouteHome(t)
+	trial := filepath.Join(home, ".dsh-trial")
+	dshRan(t,
+		dshInstance{Home: dir, Profile: "web", Port: 3080, PID: 1},
+		dshInstance{Home: trial, Profile: "trial-web", Port: 3081, PID: 2},
+	)
+	const gw = "http://127.0.0.1:3425"
+	if got, want := dshGW(dir, gw), gw+"/agent/dsh-web"; got != want {
+		t.Errorf("dshGW(default home) = %q, want %q", got, want)
+	}
+	if got, want := dshGW(trial, gw), gw+"/agent/dsh-trial-web"; got != want {
+		t.Errorf("dshGW(trial home) = %q, want %q", got, want)
+	}
+	// a home nothing runs on keeps dsh's own address
+	if got := dshGW(filepath.Join(home, ".dsh-gone"), gw); got != gw {
+		t.Errorf("dshGW(a home no instance runs on) = %q, want %q", got, gw)
+	}
+	// already named: not nested
+	if got, want := dshGW(trial, gw+"/agent/dsh-trial-web"), gw+"/agent/dsh-trial-web"; got != want {
+		t.Errorf("dshGW(already named) = %q, want %q", got, want)
+	}
+	// the gateway reads the path as the instance's only if it knows the id
+	if !dshPathAgent("dsh-trial-web") || !dshPathAgent("dsh-web") {
+		t.Error("the running instances' ids are not agents to the gateway")
+	}
+	if dshPathAgent("dsh-other") || dshPathAgent("openbot") {
+		t.Error("an id no instance has reads as one of them")
+	}
+	// and with nothing running, no id is (a stale scan names nothing)
+	dshRan(t)
+	if dshPathAgent("dsh-trial-web") {
+		t.Error("an instance still reads as running after the scan said none is")
+	}
+	// two homes of one profile name are two ids, as they are two rows
+	dshRan(t,
+		dshInstance{Home: filepath.Join(home, ".dsh-trial"), Profile: "web", Port: 3080, PID: 1},
+		dshInstance{Home: filepath.Join(home, ".dsh-work"), Profile: "web", Port: 3090, PID: 2},
+	)
+	if a, b := dshGW(filepath.Join(home, ".dsh-trial"), gw), dshGW(filepath.Join(home, ".dsh-work"), gw); a == b {
+		t.Errorf("two instances of one profile name share the address %q", a)
+	}
+}
+
+// What each row writes is that row's address at the gateway: the same pick
+// on two rows reaches the gateway as two callers, so its live calls, models
+// and sessions are two rows' there and not one dsh's.
+func TestDshInstancesWriteTheirOwnGatewayPath(t *testing.T) {
+	home, dir, web := dshRouteHome(t)
+	trial := filepath.Join(home, ".dsh-trial")
+	trialWeb := filepath.Join(trial, "profiles", "trial-web", "cordis.patch.yml")
+	if err := os.MkdirAll(filepath.Dir(trialWeb), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{web, trialWeb} {
+		if err := os.WriteFile(f, []byte(dshInstanceOwn), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dshRan(t,
+		dshInstance{Home: dir, Profile: "web", Port: 3080, PID: 1},
+		dshInstance{Home: trial, Profile: "trial-web", Port: 3081, PID: 2},
+	)
+	rows := dshInstances(home, dir)
+	if len(rows) != 1 {
+		t.Fatalf("dshInstances = %d rows, want 1", len(rows))
+	}
+	if err := rows[0].Field("model").Set("magpie/deepseek/pro"); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(trialWeb); !strings.Contains(got, "/agent/dsh-trial-web/v1") {
+		t.Errorf("the trial row's route is not at the trial instance's own address:\n%s", got)
+	}
+	if err := dsh(home).Field("model").Set("magpie/deepseek/pro"); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(web); !strings.Contains(got, "/agent/dsh-web/v1") {
+		t.Errorf("dsh's own row's route is not at its instance's own address:\n%s", got)
+	}
+}

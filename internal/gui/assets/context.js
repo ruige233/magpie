@@ -41,7 +41,9 @@
     const s = [...xs].sort((a, b) => a - b);
     return s[s.length >> 1];
   };
-  const agentMeta = (id) => (state.clients || state.agents || []).find((a) => a.id === id);
+  // an agent's own instance (dsh's per profile) is dsh#trial-web on the
+  // Agents page and dsh-trial-web in a request's Agent: a path takes no #
+  const agentMeta = (id) => (state.clients || state.agents || []).find((a) => a.id === id || a.id.replace("#", "-") === id);
   // "scripts": requests naming only a library (context.go's scriptsAgent)
   const agentLabel = (id) => (id === "scripts" ? t("Scripts") : agentMeta(id)?.name || id || t("your agent"));
   const agentIcon = (id) => icon(agentMeta(id)?.icon || "generic");

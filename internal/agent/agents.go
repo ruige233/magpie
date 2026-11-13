@@ -37,6 +37,9 @@ func init() {
 		}
 		return out
 	}
+	// a dsh on a home of its own answers at /agent/<instance>/ (dshGW), and
+	// the gateway counts what comes there as that instance's, not dsh's
+	usage.IsAgentInstance = dshPathAgent
 	// the Sessions page reads the sessions of the agents in WSL distros
 	sessions.WSLHomes = wslHomes
 	sessions.WSLRunning = WSLRunning
